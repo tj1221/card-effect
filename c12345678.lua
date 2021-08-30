@@ -1,95 +1,117 @@
+--Battlin' Boxer Kickbox
 local s,id=GetID()
 function s.initial_effect(c)
-	--search
+	c:AddSetcodesRule(0x10c0)
+	--Link summon
+	Link.AddProcedure(c,nil,2,2,s.lcheck)
+	c:EnableReviveLimit()
+	--destroy replace
 	local e1=Effect.CreateEffect(c)
-	e1:SetCategory(CATEGORY_SEARCH+CATEGORY_TOHAND)
-	e1:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
-	e1:SetCode(EVENT_SUMMON_SUCCESS)
-	e1:SetProperty(EFFECT_FLAG_DAMAGE_STEP+EFFECT_FLAG_DELAY)
-	e1:SetCountLimit(1,id)
-	e1:SetTarget(s.thtg)
-	e1:SetOperation(s.thop)
+	e1:SetType(EFFECT_TYPE_FIELD+EFFECT_TYPE_CONTINUOUS)
+	e1:SetCode(EFFECT_DESTROY_REPLACE)
+	e1:SetRange(LOCATION_MZONE)
+	e1:SetCountLimit(1)
+	e1:SetTarget(s.reptg)
+	e1:SetValue(s.repval)
 	c:RegisterEffect(e1)
-	local e2=e1:Clone()
+     --Nullifying Battle Damage
+	local e2=Effect.CreateEffect(c)
+	e2:SetDescription(aux.Stringid(id,0))
+	e2:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
 	e2:SetCode(EVENT_SPSUMMON_SUCCESS)
+	e2:SetProperty(EFFECT_FLAG_DELAY)
+	e2:SetCountLimit(1,id)
+	e2:SetCondition(s.con)
+	e2:SetOperation(s.op)
 	c:RegisterEffect(e2)
-	--effect gain to FIRE Xyz Monster
+	--ATK Boost
 	local e3=Effect.CreateEffect(c)
-	e3:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_CONTINUOUS)
-	e3:SetCode(EVENT_BE_MATERIAL)
-	e3:SetProperty(EFFECT_FLAG_EVENT_PLAYER)
-	e3:SetCountLimit(1,id)
-	e3:SetCondition(s.efcon)
-	e3:SetOperation(s.efop)
+	e3:SetDescription(aux.Stringid(id,0))
+	e3:SetCategory(CATEGORY_ATKCHANGE)
+	e3:SetType(EFFECT_TYPE_QUICK_O)
+	e3:SetCode(EVENT_PRE_DAMAGE_CALCULATE)
+	e3:SetRange(LOCATION_MZONE)
+	e2:SetCountLimit(1,id)
+	e3:SetCondition(s.condition)
+	e3:SetCost(s.cost)
+	e3:SetOperation(s.operation)
 	c:RegisterEffect(e3)
 end
- --Searches for Counter Trap or Rank-Up-Magic Spell
-s.listed_series={0x4,0x100000,0x95}
-function s.thfilter(c)
-	return (c:IsType(TYPE_TRAP) and c:IsType(TYPE_COUNTER) or c:IsSetCard(0x95) and c:IsType(TYPE_SPELL) and c:IsAbleToHand())
+s.listed_series={0x4,0x1}
+function s.lfilter(c,lc,sumtype,tp)
+	return c:IsSetCard(0x1,lc,sumtype,tp) and c:IsAttribute(ATTRIBUTE_FIRE,lc,sumtype,tp)
 end
-function s.thtg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return Duel.IsExistingMatchingCard(s.thfilter,tp,LOCATION_DECK,0,1,nil) end
-	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK)
+function s.lcheck(g,lc,sumtype,tp)
+	return g:IsExists(Card.IsAttribute,1,nil,ATTRIBUTE_FIRE,lc,sumtype,tp)
 end
-function s.thop(e,tp,eg,ep,ev,re,r,rp)
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
-	local g=Duel.SelectMatchingCard(tp,s.thfilter,tp,LOCATION_DECK,0,1,1,nil)
-	if #g>0 then
-		Duel.SendtoHand(g,nil,REASON_EFFECT)
-		Duel.ConfirmCards(1-tp,g)
-	end
+function s.repfilter(c,tp)
+	return c:IsFaceup() and c:IsRace(RACE_WARRIOR) and c:IsAttribute(ATTRIBUTE_FIRE,lc,sumtype,tp)
+		and c:IsLocation(LOCATION_MZONE) and c:IsControler(tp) and c:IsReason(REASON_BATTLE+REASON_EFFECT) and not c:IsReason(REASON_REPLACE)
 end
-	--Lists FIRE Xyz Monster
-s.listed_series={0x4,0x800000}
+function s.tgfilter(c)
+	return c:IsRace(RACE_WARRIOR) and c:IsAbleToGrave()
 end
-function s.efcon(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	return r==REASON_XYZ and c:GetReasonCard():IsAttribute(ATTRIBUTE_FIRE)
+function s.reptg(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return eg:IsExists(s.repfilter,1,nil,tp)
+		and Duel.IsExistingMatchingCard(s.tgfilter,tp,LOCATION_HAND+LOCATION_MZONE,0,1,nil) end
+	if Duel.SelectEffectYesNo(tp,e:GetHandler(),96) then
+		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_TOGRAVE)
+		local sg=Duel.SelectMatchingCard(tp,s.tgfilter,tp,LOCATION_HAND+LOCATION_MZONE,0,1,1,nil)
+		Duel.Hint(HINT_CARD,0,id)
+		Duel.SendtoGrave(sg,REASON_EFFECT+REASON_REPLACE)
+		return true
+	else return false end
 end
-	--Grant effect to FIRE Xyz monster using this card as material
-function s.efop(e,tp,eg,ep,ev,re,r,rp)
-	local c=e:GetHandler()
-	local rc=c:GetReasonCard()
-	local e1=Effect.CreateEffect(rc)
-	e1:SetDescription(aux.Stringid(id,2))
-	e1:SetType(EFFECT_TYPE_SINGLE+EFFECT_TYPE_TRIGGER_O)
-	e1:SetCode(EVENT_SPSUMMON_SUCCESS)
-	e1:SetCategory(CATEGORY_TOHAND+CATEGORY_SEARCH)
-	e1:SetProperty(EFFECT_FLAG_DELAY)
-	e1:SetCondition(s.xyzcon)
-	e1:SetTarget(s.xyztg)
-	e1:SetOperation(s.xyzop)
-	e1:SetReset(RESET_EVENT+RESETS_STANDARD)
-	rc:RegisterEffect(e1,true)
-	if not rc:IsType(TYPE_EFFECT) then
-		local e2=Effect.CreateEffect(c)
-		e2:SetType(EFFECT_TYPE_SINGLE)
-		e2:SetCode(EFFECT_ADD_TYPE)
-		e2:SetValue(TYPE_EFFECT)
-		e2:SetReset(RESET_EVENT+RESETS_STANDARD)
-		rc:RegisterEffect(e2,true)
-	end
+function s.repval(e,c)
+	return s.repfilter(c,e:GetHandlerPlayer())
 end
-	--If Xyz summoned
-function s.xyzcon(e,tp,eg,ep,ev,re,r,rp)
-	return e:GetHandler():IsSummonType(SUMMON_TYPE_XYZ)
+function s.con(e,tp,eg,ep,ev,re,r,rp)
+	return e:GetHandler():IsSummonType(SUMMON_TYPE_LINK)
 end
-	--Check for "Battlin' Boxer" monster
-function s.filter(c)
-	return c:IsSetCard(0x84) and c:IsType(TYPE_MONSTER) and c:IsAbleToHand()
+s.listed_names={id}
+function s.op(e,tp,eg,ep,ev,re,r,rp)
+	local e1=Effect.CreateEffect(e:GetHandler())
+	e1:SetType(EFFECT_TYPE_FIELD)
+	e1:SetCode(EFFECT_AVOID_BATTLE_DAMAGE)	
+	e1:SetProperty(EFFECT_FLAG_PLAYER_TARGET)
+	e1:SetTargetRange(1,0)
+	e1:SetValue(1)
+	e1:SetReset(RESET_PHASE+PHASE_END,2)	
+	Duel.RegisterEffect(e1,tp)
+	local e2=Effect.CreateEffect(e:GetHandler())
+	e2:SetProperty(EFFECT_FLAG_PLAYER_TARGET+EFFECT_FLAG_CLIENT_HINT+EFFECT_FLAG_OATH)	
+	e2:SetDescription(aux.Stringid(id,2))
+	e2:SetReset(RESET_PHASE+PHASE_END,2)
+	e2:SetTargetRange(1,0)
+	Duel.RegisterEffect(e2,tp)
 end
-	--Activation legality
-function s.xyztg(e,tp,eg,ep,ev,re,r,rp,chk)
-	if chk==0 then return Duel.IsExistingMatchingCard(s.filter,tp,LOCATION_DECK,0,1,nil) end
-	Duel.SetOperationInfo(0,CATEGORY_TOHAND,nil,1,tp,LOCATION_DECK)
+s.listed_series={0x84}
+function s.condition(e,tp,eg,ep,ev,re,r,rp)
+	local tc=Duel.GetAttackTarget()
+	if not tc then return false end
+	if tc:IsControler(1-tp) then tc=Duel.GetAttacker() end
+	e:SetLabelObject(tc)
+	return tc and tc:IsRelateToBattle() and tc:IsSetCard(0x84)
 end
-	--Add 1 "Battlin' Boxer" monster from deck
-function s.xyzop(e,tp,eg,ep,ev,re,r,rp)
+     --Checks for FIRE Warrior monster
+function s.cfilter(c)
+	return c:IsAttribute(ATTRIBUTE_FIRE) and c:IsRace(RACE_WARRIOR) and c:GetBaseAttack()>0 and c:IsAbleToRemoveAsCost() and aux.SpElimFilter(c,true)
 end
-	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_ATOHAND)
-	local g=Duel.SelectMatchingCard(tp,s.filter,tp,LOCATION_DECK,0,1,1,nil)
-	if #g>0 then
-		Duel.SendtoHand(g,nil,REASON_EFFECT)
-		Duel.ConfirmCards(1-tp,g)
-	end
+	--Banish 1 FIRE Warrior from GY
+function s.cost(e,tp,eg,ep,ev,re,r,rp,chk)
+	if chk==0 then return Duel.IsExistingMatchingCard(s.cfilter,tp,LOCATION_MZONE+LOCATION_GRAVE,0,1,e:GetHandler()) end
+	Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_REMOVE)
+	local g=Duel.SelectMatchingCard(tp,s.cfilter,tp,LOCATION_MZONE+LOCATION_GRAVE,0,1,1,e:GetHandler())
+	Duel.Remove(g,POS_FACEUP,REASON_COST)
+	e:SetLabel(g:GetFirst():GetBaseAttack())
+end
+function s.operation(e,tp,eg,ep,ev,re,r,rp,chk)
+	local tc=e:GetLabelObject()
+	if tc:IsFaceup() and tc:IsRelateToBattle() then
+	local e1=Effect.CreateEffect(c)
+		e1:SetType(EFFECT_TYPE_SINGLE)
+		e1:SetCode(EFFECT_UPDATE_ATTACK)
+		e1:SetValue(e:GetLabel())
+		e1:SetReset(RESET_EVENT+RESETS_STANDARD+PHASE_DAMAGE_CAL)
+		c:RegisterEffect(e1)
+end
