@@ -1,0 +1,8 @@
+-- Ｅｖｉｌ★Ｔｗｉｎ'ｓ トラブル・サニー
+-- Evil★Twin's Trouble Sunny
+-- Scripted by Hatter
+local s,id=GetID()
+function s.initial_effect(c)
+	c:EnableReviveLimit()
+	-- 2+ monsters, including an "Gadget" monster
+  	Link.AddProcedure(c,nil,2,4,s.lcheck)
